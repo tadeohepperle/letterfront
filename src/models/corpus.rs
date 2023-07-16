@@ -118,3 +118,16 @@ mod test {
         )
     }
 }
+
+// for scoring in future:
+// fn main2() {
+//     let corpus = Corpus::from_txt_file("assets/english3000.txt").unwrap();
+//     let mut probs: Vec<_> = corpus
+//         .char_probabilities
+//         .clone()
+//         .into_iter()
+//         .map(|(c, p)| (c, p * 100.0))
+//         .collect();
+//     probs.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+//     dbg!(probs);
+// }

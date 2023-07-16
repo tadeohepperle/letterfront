@@ -148,8 +148,8 @@ mod test {
                     .collect()
             })
             .collect();
-        let arr = Array2D::try_from(cols).unwrap();
-        arr
+        
+        Array2D::try_from(cols).unwrap()
     }
 
     #[test]

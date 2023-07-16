@@ -11,26 +11,29 @@ pub struct Letterfield {
 }
 
 impl Letterfield {
-    fn width(&self) -> usize {
+    pub fn width(&self) -> usize {
         self.field.width
     }
 
-    fn height(&self) -> usize {
+    pub fn height(&self) -> usize {
         self.field.height
     }
 
-    fn random_with_no_matches(width: usize, height: usize, corpus: &Corpus) -> Self {
+    pub fn random_with_no_matches(width: usize, height: usize, corpus: &Corpus) -> Self {
         let mut letterfield = Letterfield::random(width, height, corpus);
+        // let mut c = 0;
         loop {
             let (matches, _replacements) =
                 letterfield.find_word_matches_and_fill_spaces_randomly(corpus);
+            // c += 1;
+            // dbg!(c, matches.len());
             if matches.is_empty() {
                 break letterfield;
             }
         }
     }
 
-    fn random(width: usize, height: usize, corpus: &Corpus) -> Self {
+    pub fn random(width: usize, height: usize, corpus: &Corpus) -> Self {
         let mut cols: Vec<Vec<char>> = vec![];
         for _ in 0..width {
             let mut col: Vec<char> = vec![];
@@ -46,15 +49,14 @@ impl Letterfield {
         Self { field }
     }
 
-    fn find_word_matches_and_fill_spaces_randomly(
+    pub fn find_word_matches_and_fill_spaces_randomly(
         &mut self,
         corpus: &Corpus,
     ) -> (Vec<WordMatch>, HashSet<(char, Int2)>) {
         let word_matches = self.find_word_matches(corpus);
         let positions: HashSet<Int2> = word_matches
             .iter()
-            .map(|m| m.positions.iter().cloned())
-            .flatten()
+            .flat_map(|m| m.positions.iter().cloned())
             .collect();
         let replacements: HashSet<(char, Int2)> = positions
             .into_iter()
@@ -67,11 +69,23 @@ impl Letterfield {
         (word_matches, replacements)
     }
 
+    pub fn chars_and_positions(&self) -> Vec<(char, Int2)> {
+        let mut res: Vec<(char, Int2)> = vec![];
+        for x in 0..self.width() {
+            for y in 0..self.height() {
+                let pos = Int2 { x, y };
+                let c = self.field[pos];
+                res.push((c, pos));
+            }
+        }
+        res
+    }
+
     /// matches should be non overlapping, so if the letterfield is:
     /// Y O U T U B E   
     /// O O O O O O O
     /// then only YOUTUBE and TO are matches, not TUBE YOU or BE, because they are already contained in a match.s
-    fn find_word_matches(&self, corpus: &Corpus) -> Vec<WordMatch> {
+    pub fn find_word_matches(&self, corpus: &Corpus) -> Vec<WordMatch> {
         // for horizontal matches: check each line:
         //      start from left with start: 0 with end: width
         //      if hit, can return for that line
@@ -150,7 +164,7 @@ impl TryFrom<String> for Letterfield {
         let lines: Vec<Vec<char>> = value
             .lines()
             .map(|line| {
-                line.replace(" ", "")
+                line.replace(' ', "")
                     .to_uppercase()
                     .trim()
                     .chars()
@@ -191,5 +205,15 @@ mod test {
         let letterfield = Letterfield::random(4, 5, &corpus);
         let letterfield2: Letterfield = letterfield.to_string().try_into().unwrap();
         assert_eq!(letterfield, letterfield2);
+    }
+
+    #[test]
+    fn letterfield_matches() {
+        let corpus = Corpus::from_txt_file("assets/english3000.txt").unwrap();
+        let letterfield = Letterfield::random(20, 20, &corpus);
+        // probabilistic test but should be fine: (on average 30 matches in 20x20)
+        assert!(!letterfield.find_word_matches(&corpus).is_empty());
+        let letterfield = Letterfield::random_with_no_matches(20, 20, &corpus);
+        assert!(letterfield.find_word_matches(&corpus).is_empty());
     }
 }
