@@ -1,22 +1,36 @@
 use std::{collections::HashSet, fmt::Display};
 
 use super::{
-    array2d::{Array2D, Int2},
+    array2d::{Array2D, Array2DIter, Int2},
     corpus::Corpus,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Letterfield {
-    field: Array2D<char>,
+    id_count: u32,
+    field: Array2D<(u32, char)>,
 }
 
 impl Letterfield {
+    pub fn new(field: Array2D<(u32, char)>) -> Self {
+        Self { id_count: 0, field }
+    }
+
     pub fn width(&self) -> usize {
         self.field.width
     }
 
     pub fn height(&self) -> usize {
         self.field.height
+    }
+
+    fn next_id(&mut self) -> u32 {
+        self.id_count += 1;
+        self.id_count
+    }
+
+    pub fn iter<'a>(&'a self) -> Array2DIter<'a, (u32, char)> {
+        self.field.iter()
     }
 
     pub fn random_with_no_matches(width: usize, height: usize, corpus: &Corpus) -> Self {
@@ -34,52 +48,55 @@ impl Letterfield {
     }
 
     pub fn random(width: usize, height: usize, corpus: &Corpus) -> Self {
-        let mut cols: Vec<Vec<char>> = vec![];
+        let mut id_count = 0;
+        let mut cols: Vec<Vec<(u32, char)>> = vec![];
         for _ in 0..width {
-            let mut col: Vec<char> = vec![];
+            let mut col: Vec<(u32, char)> = vec![];
             for _ in 0..height {
                 let c = corpus.random_char();
-                col.push(c);
+                col.push((id_count, c));
+                id_count += 1;
             }
             cols.push(col);
         }
 
         let field = Array2D::try_from(cols).unwrap();
 
-        Self { field }
+        Self { id_count, field }
     }
 
     pub fn find_word_matches_and_fill_spaces_randomly(
         &mut self,
         corpus: &Corpus,
-    ) -> (Vec<WordMatch>, HashSet<(char, Int2)>) {
+    ) -> (Vec<WordMatch>, HashSet<(Int2, (u32, char))>) {
         let word_matches = self.find_word_matches(corpus);
         let positions: HashSet<Int2> = word_matches
             .iter()
             .flat_map(|m| m.positions.iter().cloned())
             .collect();
-        let replacements: HashSet<(char, Int2)> = positions
+        let replacements: HashSet<(Int2, (u32, char))> = positions
             .into_iter()
             .map(|pos| {
                 let c = corpus.random_char();
-                self.field[pos] = c;
-                (c, pos)
+                let id = self.next_id();
+                self.field[pos] = (id, c);
+                (pos, (id, c))
             })
             .collect();
         (word_matches, replacements)
     }
 
-    pub fn chars_and_positions(&self) -> Vec<(char, Int2)> {
-        let mut res: Vec<(char, Int2)> = vec![];
-        for x in 0..self.width() {
-            for y in 0..self.height() {
-                let pos = Int2 { x, y };
-                let c = self.field[pos];
-                res.push((c, pos));
-            }
-        }
-        res
-    }
+    // pub fn chars_and_positions(&self) -> Vec<(char, Int2)> {
+    //     let mut res: Vec<(char, Int2)> = vec![];
+    //     for x in 0..self.width() {
+    //         for y in 0..self.height() {
+    //             let pos = Int2 { x, y };
+    //             let c = self.field[pos];
+    //             res.push((c, pos));
+    //         }
+    //     }
+    //     res
+    // }
 
     /// matches should be non overlapping, so if the letterfield is:
     /// Y O U T U B E   
@@ -95,7 +112,7 @@ impl Letterfield {
         let mut word_matches: Vec<WordMatch> = vec![];
 
         // check all cols:
-        for (line, start) in self.field.cols() {
+        for (line, start) in self.field.cols_2() {
             for (word, s, e) in corpus.line_search(&line[..]) {
                 let positions = (s..e).map(|i| start.with_y(i)).collect();
                 let word_match = WordMatch {
@@ -107,7 +124,7 @@ impl Letterfield {
             }
         }
         // check all rows:
-        for (line, start) in self.field.rows() {
+        for (line, start) in self.field.rows_2() {
             for (word, s, e) in corpus.line_search(&line[..]) {
                 let positions = (s..e).map(|i| start.with_x(i)).collect();
                 let word_match = WordMatch {
@@ -119,7 +136,7 @@ impl Letterfield {
             }
         }
         // check top-left to bottom-right diags:
-        for (line, start) in self.field.diags(3) {
+        for (line, start) in self.field.diags_2(3) {
             for (word, s, e) in corpus.line_search(&line[..]) {
                 let positions = (s..e)
                     .map(|i| Int2 {
@@ -161,19 +178,24 @@ impl TryFrom<String> for Letterfield {
     type Error = ();
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let lines: Vec<Vec<char>> = value
+        let mut id = 0;
+        let lines: Vec<Vec<(u32, char)>> = value
             .lines()
             .map(|line| {
                 line.replace(' ', "")
                     .to_uppercase()
                     .trim()
                     .chars()
-                    .collect::<Vec<char>>()
+                    .map(|c| {
+                        id += 1;
+                        (id, c)
+                    })
+                    .collect::<Vec<(u32, char)>>()
             })
             .collect();
         let field = Array2D::try_from(lines)?.transpose();
 
-        Ok(Letterfield { field })
+        Ok(Letterfield::new(field))
     }
 }
 
@@ -184,7 +206,7 @@ impl Display for Letterfield {
             .into_iter()
             .map(|(line, _)| {
                 line.into_iter()
-                    .map(|c| c.to_string())
+                    .map(|(_, c)| c.to_string())
                     .collect::<Vec<String>>()
                     .join(" ")
             })

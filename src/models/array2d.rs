@@ -84,6 +84,66 @@ impl<T: Clone> Array2D<T> {
             })
             .collect()
     }
+
+    pub fn iter(&self) -> Array2DIter<'_, T> {
+        Array2DIter {
+            col: 0,
+            row: 0,
+            array: &self,
+        }
+    }
+}
+
+impl<A: Clone, B: Clone> Array2D<(A, B)> {
+    pub fn rows_2(&self) -> Vec<(Vec<B>, Int2)> {
+        (0..self.height)
+            .map(|row_index| {
+                let row: Vec<B> = self
+                    .cols
+                    .iter()
+                    .map(|col| col[row_index].1.clone())
+                    .collect();
+                (row, Int2 { x: 0, y: row_index })
+            })
+            .collect()
+    }
+
+    pub fn cols_2(&self) -> Vec<(Vec<B>, Int2)> {
+        (0..self.width)
+            .map(|col_index| {
+                let col: Vec<B> = self.cols[col_index]
+                    .iter()
+                    .map(|(a, b)| b.clone())
+                    .collect();
+                (col, Int2 { x: col_index, y: 0 })
+            })
+            .collect()
+    }
+
+    pub fn diags_2(&self, min_len: usize) -> Vec<(Vec<B>, Int2)> {
+        let mut diag_start_points: Vec<Int2> = vec![];
+        for i in 0..(self.height + 1 - min_len) {
+            diag_start_points.push(Int2 { x: 0, y: i });
+        }
+        for i in 1..(self.width + 1 - min_len) {
+            diag_start_points.push(Int2 { x: i, y: 0 });
+        }
+        diag_start_points
+            .into_iter()
+            .map(|start_point| {
+                let Int2 { mut x, mut y } = start_point;
+                let travel = (self.width - x).min(self.height - y);
+                let mut diag: Vec<B> = vec![];
+                for _ in 0..travel {
+                    let (a, b) = self[Int2 { x, y }].clone();
+                    diag.push(b);
+                    x += 1;
+                    y += 1;
+                }
+                (diag, start_point)
+            })
+            .collect()
+    }
 }
 
 impl<T> TryFrom<Vec<Vec<T>>> for Array2D<T> {
@@ -132,6 +192,33 @@ fn transpose_vecs<T: Clone>(vecs: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     outer
 }
 
+pub struct Array2DIter<'a, T> {
+    col: usize,
+    row: usize,
+    array: &'a Array2D<T>,
+}
+
+impl<'a, T: Clone> Iterator for Array2DIter<'a, T> {
+    type Item = (Int2, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.row >= self.array.height {
+            self.col += 1;
+            self.row = 0;
+        }
+        if self.col >= self.array.width {
+            return None;
+        }
+        let pos = Int2 {
+            x: self.col,
+            y: self.row,
+        };
+        let item = self.array[pos].clone();
+        self.row += 1;
+        return Some((pos, item));
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::models::array2d::Array2D;
@@ -148,7 +235,7 @@ mod test {
                     .collect()
             })
             .collect();
-        
+
         Array2D::try_from(cols).unwrap()
     }
 
