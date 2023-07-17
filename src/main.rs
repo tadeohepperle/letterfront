@@ -22,12 +22,11 @@ use bevy::{
     winit::WinitSettings,
 };
 
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use constants::*;
 use resources::ResourcesPlugin;
-use state::IngameState;
-use systems::MainSystemsPlugin;
-
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use state::{IngameState, StateSystemsPlugin};
+use systems::{input::InputSystemsPlugin, setup::SetupSystemsPlugin};
 
 pub mod components;
 pub mod constants;
@@ -50,8 +49,10 @@ fn main() {
         .add_state::<IngameState>()
         .add_plugins(EventsPlugin)
         .add_plugins(ResourcesPlugin)
-        .add_plugins(MainSystemsPlugin)
+        .add_plugins(StateSystemsPlugin)
         .add_plugins(EguiPlugin)
+        .add_plugins(SetupSystemsPlugin)
+        .add_plugins(InputSystemsPlugin)
         .add_systems(Update, egui_debug)
         // .add_systems(Update, cursor_grab_system)
         .run();
