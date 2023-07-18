@@ -5,7 +5,25 @@ use crate::{
     models::array2d::Int2,
 };
 
+#[cfg(test)]
+#[test]
+pub fn test_inv_char_pos() {
+    let (w, h) = (34, 7);
+    let char_pos = Int2 { x: 3, y: 6 };
+    let inv = inv_char_pos_y(char_pos, w, h);
+    let inv_inv = inv_char_pos_y(inv, w, h);
+    assert_eq!(inv_inv, char_pos);
+}
+
+pub fn inv_char_pos_y(char_pos: Int2, w: usize, h: usize) -> Int2 {
+    Int2 {
+        x: char_pos.x,
+        y: h - char_pos.y - 1,
+    }
+}
+
 pub fn char_pos_to_world_pos(char_pos: Int2, w: usize, h: usize) -> Vec2 {
+    let char_pos = inv_char_pos_y(char_pos, w, h);
     let x = (char_pos.x as f32 - w as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
     let y = (char_pos.y as f32 - h as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
     Vec2 { x, y }
@@ -14,10 +32,11 @@ pub fn char_pos_to_world_pos(char_pos: Int2, w: usize, h: usize) -> Vec2 {
 pub fn world_pos_to_char_pos(world_pos: Vec2, w: usize, h: usize) -> Int2 {
     let x = (world_pos.x / (TILE_GAP_FACTOR * TILE_SIZE)) + w as f32 / 2.0;
     let y = (world_pos.y / (TILE_GAP_FACTOR * TILE_SIZE)) + h as f32 / 2.0;
-    Int2 {
+    let char_pos = Int2 {
         x: x.round() as usize,
         y: y.round() as usize,
-    }
+    };
+    inv_char_pos_y(char_pos, w, h)
 }
 
 /// cursor_pos is in world_pos space, bool = move is vertical:
@@ -32,8 +51,9 @@ pub fn cursor_pos_to_grabbed_tile_pos(
     // restrict the movement by the rect:
     let Vec2 { x: x_min, y: y_min } = char_pos_to_world_pos(Int2 { x: 0, y: 0 }, w, h);
     let Vec2 { x: x_max, y: y_max } = char_pos_to_world_pos(Int2 { x: w - 1, y: h - 1 }, w, h);
-    free_pos.x = free_pos.x.max(x_min).min(x_max);
-    free_pos.y = free_pos.y.max(y_min).min(y_max);
+    free_pos.x = free_pos.x.clamp(x_min, x_max);
+    free_pos.y = free_pos.y.clamp(y_max, y_min); // inverted because y inverted before
+
     // either move horizontally or vertically, not both:
     let original_tile_world_pos = char_pos_to_world_pos(original_char_pos, w, h);
 

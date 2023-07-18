@@ -1,4 +1,8 @@
-use bevy::{prelude::*, text::TextStyle, utils::HashSet};
+use bevy::{
+    prelude::*,
+    text::TextStyle,
+    utils::{HashMap, HashSet},
+};
 
 use crate::{
     constants::{LETTERFIELD_SIZE, LETTERTILE_TEXT_SIZE},
@@ -35,17 +39,22 @@ pub struct LetterfieldResource(pub Letterfield);
 #[derive(Debug, Clone, Resource, Default)]
 pub struct WordMatchesResource {
     pub matches: Vec<WordMatch>,
-    pub involved_ids: HashSet<u32>,
+    pub id_counts: HashMap<u32, usize>,
 }
 
 impl WordMatchesResource {
     pub fn set_matches(&mut self, matches: Vec<WordMatch>) {
-        let involved_ids: HashSet<u32> = matches
-            .iter()
-            .flat_map(|m| m.tiles.iter().map(|(id, ..)| *id))
-            .collect();
+        let mut id_counts: HashMap<u32, usize> = HashMap::new();
+
+        for m in &matches {
+            for (id, _, _) in &m.tiles {
+                let e = id_counts.entry(*id).or_insert(0);
+                *e += 1;
+            }
+        }
+
         self.matches = matches;
-        self.involved_ids = involved_ids;
+        self.id_counts = id_counts;
     }
 
     pub fn clear(&mut self) {
@@ -91,8 +100,7 @@ fn load_text_styles(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// todo later: put this in loading stage
 fn load_corpus_and_init_letterfield(mut commands: Commands) {
     let corpus = Corpus::from_txt_file("assets/english3000.txt").unwrap();
-    let letterfield =
-        Letterfield::random_with_no_matches(LETTERFIELD_SIZE.x, LETTERFIELD_SIZE.y, &corpus);
+    let letterfield = Letterfield::random(LETTERFIELD_SIZE.x, LETTERFIELD_SIZE.y, &corpus);
     commands.insert_resource(CorpusResource(corpus));
     commands.insert_resource(LetterfieldResource(letterfield));
 

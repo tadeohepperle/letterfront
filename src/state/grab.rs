@@ -140,12 +140,15 @@ pub fn update_word_matches_colors(
     for (letter_tile, children) in &tiles {
         for child in children {
             if let Ok(mut sprite) = tile_sprites.get_mut(*child) {
-                let is_in_match = word_matches.involved_ids.contains(&letter_tile.id);
-                if is_in_match {
-                    sprite.color = Color::BLUE;
-                } else {
-                    sprite.color = Color::WHITE;
-                }
+                let count = *word_matches.id_counts.get(&letter_tile.id).unwrap_or(&0);
+
+                sprite.color = match count {
+                    0 => Color::WHITE,
+                    1 => Color::LIME_GREEN,
+                    2 => Color::GREEN,
+                    3 => Color::DARK_GREEN,
+                    _ => Color::PURPLE,
+                };
             }
         }
     }
