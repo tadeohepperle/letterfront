@@ -20,18 +20,14 @@ pub fn world_pos_to_char_pos(world_pos: Vec2, w: usize, h: usize) -> Int2 {
     }
 }
 
-pub enum Direction {
-    Horizontal,
-    Vertical,
-}
-
 /// cursor_pos is in world_pos space, bool = move is vertical:
 pub fn cursor_pos_to_grabbed_tile_pos(
     cursor_pos: Vec2,
     w: usize,
     h: usize,
-    original_char_pos: Int2,
-) -> (Vec2, Int2, Option<Direction>) {
+    original_char_pos: Int2, // when dragging started
+    new_char_pos: Int2, // if already dragged a bit, this is different from original_char_pos, but always in same row/col
+) -> (Vec2, Int2) {
     let mut free_pos = cursor_pos;
     // restrict the movement by the rect:
     let Vec2 { x: x_min, y: y_min } = char_pos_to_world_pos(Int2 { x: 0, y: 0 }, w, h);
@@ -50,20 +46,52 @@ pub fn cursor_pos_to_grabbed_tile_pos(
         y: original_tile_world_pos.y,
     };
 
-    let (optimal_restricted, is_vertical) =
-        if vertical_only.distance(free_pos) < horizontal_only.distance(free_pos) {
-            (vertical_only, true)
-        } else {
-            (horizontal_only, false)
-        };
+    // todo: needle add grab threshold
+
+    // set optimally restricted to the closest distance to mouse:
+    let optimal_restricted = match (
+        new_char_pos.x == original_char_pos.x,
+        new_char_pos.y == original_char_pos.y,
+    ) {
+        (true, true) => {
+            // not moved yet, the distance decides which direction it is gonna be:
+            if vertical_only.distance(free_pos) < horizontal_only.distance(free_pos) {
+                vertical_only
+            } else {
+                horizontal_only
+            }
+        }
+        (true, false) => {
+            // vertical movement:
+            vertical_only
+        }
+        (false, true) => {
+            // horizontal movement:
+            horizontal_only
+        }
+        (false, false) => panic!("should not be reachable"),
+    };
+
+    //     (new_char_pos.x, new_char_pos.y) => {
+    //         if vertical_only.distance(free_pos) < horizontal_only.distance(free_pos) {
+    //   vertical_only
+    // } else {
+    //   horizontal_only
+    // }
+    // },
+
+    // if new_char_pos == original_char_pos{
+    //     // distance decides:
+    //     if vertical_only.distance(free_pos) < horizontal_only.distance(free_pos) {
+    //         vertical_only
+    //     } else {
+    //         horizontal_only
+    //     };
+    // } else if new_char_pos.x != original_char_pos
+
+    // but, if already dragged in one direction that should be the optimally restricted one instead:
 
     let new_char_pos = world_pos_to_char_pos(optimal_restricted, w, h);
 
-    let direction = match (new_char_pos == original_char_pos, is_vertical) {
-        (true, _) => None,
-        (false, true) => Some(Direction::Vertical),
-        (false, false) => Some(Direction::Horizontal),
-    };
-
-    (optimal_restricted, new_char_pos, direction)
+    (optimal_restricted, new_char_pos)
 }

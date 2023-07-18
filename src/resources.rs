@@ -1,8 +1,12 @@
-use bevy::{prelude::*, text::TextStyle};
+use bevy::{prelude::*, text::TextStyle, utils::HashSet};
 
 use crate::{
     constants::{LETTERFIELD_SIZE, LETTERTILE_TEXT_SIZE},
-    models::{array2d::Int2, corpus::Corpus, letterfield::Letterfield},
+    models::{
+        array2d::Int2,
+        corpus::Corpus,
+        letterfield::{Letterfield, WordMatch},
+    },
 };
 
 pub struct ResourcesPlugin;
@@ -10,6 +14,7 @@ pub struct ResourcesPlugin;
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.init_resource::<GrabbedLetterResource>()
+            .init_resource::<WordMatchesResource>()
             .init_resource::<CursorState>()
             .add_systems(PreStartup, load_corpus_and_init_letterfield)
             .add_systems(PreStartup, load_text_styles);
@@ -27,6 +32,27 @@ pub struct CorpusResource(pub Corpus);
 #[derive(Debug, Clone, Resource)]
 pub struct LetterfieldResource(pub Letterfield);
 
+#[derive(Debug, Clone, Resource, Default)]
+pub struct WordMatchesResource {
+    pub matches: Vec<WordMatch>,
+    pub involved_ids: HashSet<u32>,
+}
+
+impl WordMatchesResource {
+    pub fn set_matches(&mut self, matches: Vec<WordMatch>) {
+        let involved_ids: HashSet<u32> = matches
+            .iter()
+            .flat_map(|m| m.tiles.iter().map(|(id, ..)| *id))
+            .collect();
+        self.matches = matches;
+        self.involved_ids = involved_ids;
+    }
+
+    pub fn clear(&mut self) {
+        *self = Default::default();
+    }
+}
+
 /// u32 is the id in terms of the letterfield
 #[derive(Debug, Clone, Resource, Default)]
 pub struct GrabbedLetterResource(pub Option<GrabbedLetter>);
@@ -35,7 +61,8 @@ pub struct GrabbedLetterResource(pub Option<GrabbedLetter>);
 pub struct GrabbedLetter {
     pub entity: Entity,
     pub id: u32,
-    pub original_pos: Int2,
+    pub original_char_pos: Int2,
+    pub new_char_pos: Int2,
     pub offset_to_cursor: Vec2,
 }
 

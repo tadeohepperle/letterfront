@@ -8,8 +8,8 @@ use bevy::{
     window::{CursorGrabMode, PresentMode},
 };
 
-use events::EventsPlugin;
-use models::{array2d::Int2, corpus::Corpus, letterfield::Letterfield};
+use letterfront::models::{array2d::Int2, corpus::Corpus, letterfield::Letterfield};
+use letterfront::{events::EventsPlugin, resources::WordMatchesResource};
 use rand::random;
 
 use bevy::{
@@ -23,19 +23,10 @@ use bevy::{
 };
 
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use constants::*;
-use resources::ResourcesPlugin;
-use state::{IngameState, StateSystemsPlugin};
-use systems::{input::InputSystemsPlugin, setup::SetupSystemsPlugin};
-
-pub mod components;
-pub mod constants;
-pub mod events;
-pub mod models;
-pub mod resources;
-pub mod state;
-pub mod systems;
-pub mod utils;
+use letterfront::constants::*;
+use letterfront::resources::{LetterfieldResource, ResourcesPlugin};
+use letterfront::state::{IngameState, StateSystemsPlugin};
+use letterfront::systems::{input::InputSystemsPlugin, setup::SetupSystemsPlugin};
 
 fn main() {
     App::new()
@@ -55,12 +46,20 @@ fn main() {
         .add_plugins(SetupSystemsPlugin)
         .add_plugins(InputSystemsPlugin)
         .add_systems(Update, egui_debug)
+        .add_systems(Update, bevy::window::close_on_esc)
         // .add_systems(Update, cursor_grab_system)
         .run();
 }
 
-fn egui_debug(mut contexts: EguiContexts, ingame_state: Res<State<IngameState>>) {
+fn egui_debug(
+    mut contexts: EguiContexts,
+    ingame_state: Res<State<IngameState>>,
+    letterfield: Res<LetterfieldResource>,
+    word_matches: Res<WordMatchesResource>,
+) {
     egui::Window::new("Info").show(contexts.ctx_mut(), |ui| {
         ui.label(format!("IngameState: {:?}", ingame_state));
+        ui.label(format!("Letterfield: \n {}", &letterfield.0));
+        ui.label(format!("Matches: \n {:?}", &word_matches));
     });
 }

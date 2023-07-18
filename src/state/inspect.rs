@@ -19,7 +19,7 @@ impl Plugin for IngameStateInspectPlugin {
     }
 }
 
-fn update_hover_colors(
+pub fn update_hover_colors(
     q_tiles: Query<(&HoverTile, &Children)>,
     mut q_tile_sprites: Query<&mut Sprite>,
 ) {
@@ -68,7 +68,8 @@ fn update_hover_state(
                     id: letter_tile.id,
                     entity,
                     offset_to_cursor: cursor_state.world_pos - transform.translation.truncate(),
-                    original_pos: letter_tile.pos,
+                    original_char_pos: letter_tile.pos,
+                    new_char_pos: letter_tile.pos,
                 });
                 window.cursor.visible = false;
                 next_state.set(IngameState::Grab);

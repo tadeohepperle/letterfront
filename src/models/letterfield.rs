@@ -1,4 +1,7 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{
+    collections::HashSet,
+    fmt::{format, Display},
+};
 
 use super::{
     array2d::{Array2D, Array2DIter, Int2},
@@ -12,6 +15,60 @@ pub struct Letterfield {
 }
 
 impl Letterfield {
+    /// letter can either be moved horizontally or vertically.
+    ///
+    /// returns the ids of the tiles that were effected.
+    ///
+    /// # panics
+    ///
+    /// if the porvided positions out of bounds or not in same row/column
+    pub fn move_letter(&mut self, old_pos: Int2, new_pos: Int2) {
+        assert!(old_pos.x == new_pos.x || old_pos.y == new_pos.y);
+
+        assert!(
+            old_pos.x < self.width()
+                && new_pos.x < self.width()
+                && old_pos.y < self.height()
+                && new_pos.y < self.height()
+        );
+        if old_pos == new_pos {
+            return;
+        }
+
+        let element = self.field[old_pos];
+        if new_pos.x < old_pos.x {
+            // horizontal move to the left
+            assert_eq!(new_pos.y, old_pos.y);
+            let y = new_pos.y;
+            for x in (new_pos.x..old_pos.x).rev() {
+                self.field[Int2 { x: x + 1, y }] = self.field[Int2 { x, y }]
+            }
+        } else if new_pos.x > old_pos.x {
+            // horizontal move to the right
+            assert_eq!(new_pos.y, old_pos.y);
+            let y = new_pos.y;
+            for x in (old_pos.x + 1)..=new_pos.x {
+                self.field[Int2 { x: x - 1, y }] = self.field[Int2 { x, y }]
+            }
+        } else if new_pos.y < old_pos.y {
+            // vertical move up
+            assert_eq!(new_pos.x, old_pos.x);
+            let x = new_pos.x;
+            for y in (new_pos.y..old_pos.y).rev() {
+                self.field[Int2 { x, y: y + 1 }] = self.field[Int2 { x, y }]
+            }
+        } else if new_pos.y > old_pos.y {
+            // vertical move down
+            assert_eq!(new_pos.x, old_pos.x);
+            let x = new_pos.x;
+
+            for y in (old_pos.y + 1)..=new_pos.y {
+                self.field[Int2 { x, y: y - 1 }] = self.field[Int2 { x, y }]
+            }
+        }
+        self.field[new_pos] = element;
+    }
+
     pub fn new(field: Array2D<(u32, char)>) -> Self {
         Self { id_count: 0, field }
     }
@@ -22,6 +79,10 @@ impl Letterfield {
 
     pub fn height(&self) -> usize {
         self.field.height
+    }
+
+    pub fn dimensions(&self) -> (usize, usize) {
+        (self.field.width, self.field.height)
     }
 
     fn next_id(&mut self) -> u32 {
@@ -72,7 +133,7 @@ impl Letterfield {
         let word_matches = self.find_word_matches(corpus);
         let positions: HashSet<Int2> = word_matches
             .iter()
-            .flat_map(|m| m.positions.iter().cloned())
+            .flat_map(|m| m.tiles.iter().map(|(_, _, pos)| *pos))
             .collect();
         let replacements: HashSet<(Int2, (u32, char))> = positions
             .into_iter()
@@ -114,10 +175,16 @@ impl Letterfield {
         // check all cols:
         for (line, start) in self.field.cols_2() {
             for (word, s, e) in corpus.line_search(&line[..]) {
-                let positions = (s..e).map(|i| start.with_y(i)).collect();
+                let tiles = (s..e)
+                    .map(|i| {
+                        let pos = start.with_y(i);
+                        let (id, ch) = self.field[pos];
+                        (id, ch, pos)
+                    })
+                    .collect();
                 let word_match = WordMatch {
                     word,
-                    positions,
+                    tiles,
                     kind: WordMatchKind::Column,
                 };
                 word_matches.push(word_match);
@@ -126,10 +193,16 @@ impl Letterfield {
         // check all rows:
         for (line, start) in self.field.rows_2() {
             for (word, s, e) in corpus.line_search(&line[..]) {
-                let positions = (s..e).map(|i| start.with_x(i)).collect();
+                let tiles = (s..e)
+                    .map(|i| {
+                        let pos = start.with_x(i);
+                        let (id, ch) = self.field[pos];
+                        (id, ch, pos)
+                    })
+                    .collect();
                 let word_match = WordMatch {
                     word,
-                    positions,
+                    tiles,
                     kind: WordMatchKind::Row,
                 };
                 word_matches.push(word_match);
@@ -138,15 +211,19 @@ impl Letterfield {
         // check top-left to bottom-right diags:
         for (line, start) in self.field.diags_2(3) {
             for (word, s, e) in corpus.line_search(&line[..]) {
-                let positions = (s..e)
-                    .map(|i| Int2 {
-                        x: start.x + i,
-                        y: start.y + i,
+                let tiles = (s..e)
+                    .map(|i| {
+                        let pos = Int2 {
+                            x: start.x + i,
+                            y: start.y + i,
+                        };
+                        let (id, ch) = self.field[pos];
+                        (id, ch, pos)
                     })
                     .collect();
                 let word_match = WordMatch {
                     word,
-                    positions,
+                    tiles,
                     kind: WordMatchKind::Row,
                 };
                 word_matches.push(word_match);
@@ -156,19 +233,35 @@ impl Letterfield {
         // return all matches found:
         word_matches
     }
+
+    pub fn to_detail_string(&self) -> String {
+        let rows = self.field.rows();
+        let output = rows
+            .into_iter()
+            .map(|(line, _)| {
+                line.into_iter()
+                    .map(|(id, c)| format!("({id}, {c})"))
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        output
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct WordMatch {
-    word: String,
+    pub word: String,
     // char, x as in -->, y as in |
     //                            V
-    positions: Vec<Int2>,
-    kind: WordMatchKind,
+    pub tiles: Vec<(u32, char, Int2)>,
+    pub kind: WordMatchKind,
 }
 
 #[derive(Debug, Clone)]
-enum WordMatchKind {
+pub enum WordMatchKind {
     Column,
     Row,
     Diagonal,
