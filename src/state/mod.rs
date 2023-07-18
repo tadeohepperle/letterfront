@@ -25,10 +25,5 @@ impl Plugin for StateSystemsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(IngameStateGrabPlugin)
             .add_plugins(IngameStateInspectPlugin);
-        // app.add_plugins((
-        //     SetupSystemsPlugin,
-        //     AnimationSystemsPlugin,
-        //     InputSystemsPlugin,
-        // ));
     }
 }

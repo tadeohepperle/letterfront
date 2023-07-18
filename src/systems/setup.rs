@@ -5,6 +5,7 @@ use crate::{
     constants::{TILE_GAP_FACTOR, TILE_SIZE, TILE_SPRITE_SIZE},
     models::{array2d::Int2, letterfield::Letterfield},
     resources::{FontAssets, LetterfieldResource},
+    utils::char_pos_to_world_pos,
 };
 
 pub struct SetupSystemsPlugin;
@@ -25,7 +26,6 @@ fn setup_letter_field_tiles(
     letterfield: Res<LetterfieldResource>,
     font_assets: Res<FontAssets>,
     asset_server: Res<AssetServer>,
-    mut letter_tiles: Query<(Entity, &mut LetterTile)>,
 ) {
     // create lettertiles
     for (pos, (id, character)) in letterfield.0.iter() {
@@ -39,58 +39,7 @@ fn setup_letter_field_tiles(
             &mut commands,
         );
     }
-
-    // let letter_HashSet<u32>
 }
-
-// fn update_letter_field_tiles(
-//     mut commands: Commands,
-//     letterfield: Res<LetterfieldResource>,
-//     font_assets: Res<FontAssets>,
-//     asset_server: Res<AssetServer>,
-//     mut letter_tiles: Query<(Entity, &mut LetterTile)>,
-// ) {
-//     // id -> char, pos, exists
-//     let mut letterfield_data: HashMap<u32, (char, Int2, bool)> = letterfield
-//         .0
-//         .iter()
-//         .map(|(pos, (id, char))| (id, (char, pos, false)))
-//         .collect();
-
-//     let mut entities_out_of_date: Vec<Entity> = vec![];
-
-//     // update all the entities (positions)
-//     for (entity, mut letter_tile) in &mut letter_tiles {
-//         if let Some((char, pos, exists)) = letterfield_data.get_mut(&letter_tile.id) {
-//             *exists = true;
-//             letter_tile.pos = *pos;
-//             letter_tile.character = *char;
-//         } else {
-//             entities_out_of_date.push(entity)
-//         }
-//     }
-
-//     // queue lettertiles that are out of date to be destroyed??
-//     // todo!()
-
-//     // create lettertiles that are not there yet.
-//     for (id, (character, pos, _)) in letterfield_data
-//         .iter()
-//         .filter(|(_, (_, _, exists))| !exists)
-//     {
-//         create_new_letter_tile(
-//             *id,
-//             *character,
-//             *pos,
-//             &letterfield.0,
-//             &font_assets,
-//             &asset_server,
-//             &mut commands,
-//         );
-//     }
-
-//     // let letter_HashSet<u32>
-// }
 
 fn create_new_letter_tile(
     id: u32,
@@ -102,14 +51,12 @@ fn create_new_letter_tile(
     asset_server: &AssetServer,
     commands: &mut Commands,
 ) {
-    let x = (pos.x as f32 - letterfield.width() as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
-    let y = (pos.y as f32 - letterfield.height() as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
-
+    let word_pos = char_pos_to_world_pos(pos, letterfield.width(), letterfield.height());
     // the parent:
     let tile = (
         SpatialBundle {
             transform: Transform {
-                translation: Vec3 { x, y, z: 2.0 },
+                translation: word_pos.extend(2.0),
                 ..default()
             },
             ..default()

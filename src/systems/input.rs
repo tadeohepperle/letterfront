@@ -3,8 +3,7 @@ use bevy::{prelude::*, window::CursorGrabMode};
 use crate::{
     components::{HoverTile, LetterTile},
     constants::TILE_SIZE,
-    events::CursorStateEvent,
-    resources::{GrabbedLetter, GrabbedLetterResource},
+    resources::{CursorState, GrabbedLetter, GrabbedLetterResource},
 };
 
 pub struct InputSystemsPlugin;
@@ -19,7 +18,8 @@ fn send_cursor_state_events(
     mut cursor_moved: EventReader<CursorMoved>,
     camera: Query<&Transform, With<Camera>>,
     mouse: Res<Input<MouseButton>>,
-    mut cursor_state_events: EventWriter<CursorStateEvent>,
+
+    mut cursor_state: ResMut<CursorState>,
 ) {
     /// credit: https://stackoverflow.com/questions/65396065/what-is-an-acceptable-approach-to-dragging-sprites-with-bevy-0-4
     fn cursor_to_world(window: &Window, cam_transform: &Transform, cursor_pos: Vec2) -> Vec2 {
@@ -34,6 +34,7 @@ fn send_cursor_state_events(
         let out = cam_transform.compute_matrix() * screen_pos.extend(0.0).extend(1.0);
         Vec2::new(out.x, -out.y)
     }
+    cursor_state.pressed = mouse.pressed(MouseButton::Left);
 
     if let Some(e) = cursor_moved.iter().last() {
         let screen_pos = e.position;
@@ -42,10 +43,7 @@ fn send_cursor_state_events(
             camera.get_single().unwrap(),
             e.position,
         );
-        cursor_state_events.send(CursorStateEvent {
-            world_pos,
-            screen_pos,
-            pressed: mouse.pressed(MouseButton::Left),
-        })
+        cursor_state.world_pos = world_pos;
+        cursor_state.screen_pos = screen_pos;
     }
 }

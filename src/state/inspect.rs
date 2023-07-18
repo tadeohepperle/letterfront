@@ -3,8 +3,7 @@ use bevy::prelude::*;
 use crate::{
     components::{HoverTile, LetterTile},
     constants::TILE_SIZE,
-    events::CursorStateEvent,
-    resources::{GrabbedLetter, GrabbedLetterResource},
+    resources::{CursorState, GrabbedLetter, GrabbedLetterResource},
 };
 
 use super::IngameState;
@@ -13,13 +12,14 @@ pub struct IngameStateInspectPlugin;
 impl Plugin for IngameStateInspectPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(
-            Update,
-            lerp_hovered_letters_color.run_if(in_state(IngameState::Inspect)),
-        );
+            PreUpdate,
+            update_hover_state.run_if(in_state(IngameState::Inspect)),
+        )
+        .add_systems(Update, update_hover_colors);
     }
 }
 
-fn lerp_hovered_letters_color(
+fn update_hover_colors(
     q_tiles: Query<(&HoverTile, &Children)>,
     mut q_tile_sprites: Query<&mut Sprite>,
 ) {
@@ -37,16 +37,13 @@ fn lerp_hovered_letters_color(
     }
 }
 
-fn update_tile_hovered(
+fn update_hover_state(
     mut letter_tiles: Query<(Entity, &Transform, &mut HoverTile, &LetterTile)>,
-    mut cursor_state_events: EventReader<CursorStateEvent>,
+    mut cursor_state: Res<CursorState>,
     mut windows: Query<&mut Window>,
     mut grabbed_letter: ResMut<GrabbedLetterResource>,
+    mut next_state: ResMut<NextState<IngameState>>,
 ) {
-    let Some(cursor_state) = cursor_state_events.iter().last() else {
-        return;
-    };
-
     fn cursor_is_on_tile(cursor_world_pos: &Vec2, tile_transform: &Transform) -> bool {
         let x_close = (tile_transform.translation.x - cursor_world_pos.x).abs()
             <= tile_transform.scale.x * TILE_SIZE / 2.0;
@@ -67,13 +64,14 @@ fn update_tile_hovered(
             any_hovered = true;
 
             if cursor_state.pressed && grabbed_letter.0.is_none() {
-                dbg!(("Start dragging", letter_tile));
                 grabbed_letter.0 = Some(GrabbedLetter {
                     id: letter_tile.id,
                     entity,
                     offset_to_cursor: cursor_state.world_pos - transform.translation.truncate(),
+                    original_pos: letter_tile.pos,
                 });
                 window.cursor.visible = false;
+                next_state.set(IngameState::Grab);
             }
         } else {
             // if hover_tile.hovered {

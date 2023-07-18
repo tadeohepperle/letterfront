@@ -2,7 +2,7 @@ use bevy::{prelude::*, text::TextStyle};
 
 use crate::{
     constants::{LETTERFIELD_SIZE, LETTERTILE_TEXT_SIZE},
-    models::{corpus::Corpus, letterfield::Letterfield},
+    models::{array2d::Int2, corpus::Corpus, letterfield::Letterfield},
 };
 
 pub struct ResourcesPlugin;
@@ -10,6 +10,7 @@ pub struct ResourcesPlugin;
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.init_resource::<GrabbedLetterResource>()
+            .init_resource::<CursorState>()
             .add_systems(PreStartup, load_corpus_and_init_letterfield)
             .add_systems(PreStartup, load_text_styles);
     }
@@ -34,7 +35,15 @@ pub struct GrabbedLetterResource(pub Option<GrabbedLetter>);
 pub struct GrabbedLetter {
     pub entity: Entity,
     pub id: u32,
+    pub original_pos: Int2,
     pub offset_to_cursor: Vec2,
+}
+
+#[derive(Debug, Clone, Resource, Default)]
+pub struct CursorState {
+    pub world_pos: Vec2,
+    pub screen_pos: Vec2,
+    pub pressed: bool,
 }
 
 // todo! LetterGrabStopEvent

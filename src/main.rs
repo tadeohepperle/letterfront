@@ -35,6 +35,7 @@ pub mod models;
 pub mod resources;
 pub mod state;
 pub mod systems;
+pub mod utils;
 
 fn main() {
     App::new()
