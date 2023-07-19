@@ -26,17 +26,18 @@ impl Plugin for IngameStateGrabPlugin {
             move_grabbed_letter_to_cursor.run_if(in_state(IngameState::Grab)),
         )
         .add_systems(
-            PreUpdate,
+            PostUpdate,
             exit_grabbed_state_if_not_mouse_pressed.run_if(in_state(IngameState::Grab)),
         )
         .add_systems(
             Update,
             move_letter_tiles_to_correct_positions, // not only in grab state.
         )
-        .add_systems(
-            Update,
-            update_word_matches_colors.after(update_hover_colors),
-        );
+        // .add_systems(
+        //     Update,
+        //     update_word_matches_colors.after(update_hover_colors),
+        // );
+        ;
     }
 }
 
@@ -45,6 +46,7 @@ fn exit_grabbed_state_if_not_mouse_pressed(
     mut next_state: ResMut<NextState<IngameState>>,
     mut windows: Query<&mut Window>,
     mut grabbed_letter: ResMut<GrabbedLetterResource>,
+    mut word_matches: ResMut<WordMatchesResource>,
 ) {
     let mut window = windows.get_single_mut().unwrap();
 
@@ -54,7 +56,12 @@ fn exit_grabbed_state_if_not_mouse_pressed(
         window.cursor.visible = true;
         // window.cursor.grab_mode = CursorGrabMode::Locked;
         // window.set_cursor_position(Some(Vec2 { x: 0., y: 0. })); // todo!() needle
-        next_state.set(IngameState::Inspect);
+
+        if word_matches.matches.is_empty() {
+            next_state.set(IngameState::Inspect);
+        } else {
+            next_state.set(IngameState::Resolve);
+        }
     }
 }
 
@@ -137,6 +144,8 @@ pub fn update_word_matches_colors(
     mut tile_sprites: Query<&mut Sprite>,
     word_matches: Res<WordMatchesResource>,
 ) {
+    // disable for now
+
     for (letter_tile, children) in &tiles {
         for child in children {
             if let Ok(mut sprite) = tile_sprites.get_mut(*child) {

@@ -52,11 +52,11 @@ impl Corpus {
         }
     }
 
-    pub fn from_txt_file(path: impl AsRef<Path>) -> Result<Self, ()> {
+    pub fn from_txt_file(path: impl AsRef<Path>, min_word_len: usize) -> Result<Self, ()> {
         let content = std::fs::read_to_string(path).map_err(|_| ())?;
         let words = content.lines().filter_map(|line| {
             let line = line.trim();
-            if line.is_empty() {
+            if line.len() < min_word_len {
                 None
             } else {
                 Some(line)

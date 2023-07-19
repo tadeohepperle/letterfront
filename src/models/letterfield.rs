@@ -3,6 +3,8 @@ use std::{
     fmt::{format, Display},
 };
 
+use bevy::utils::HashMap;
+
 use super::{
     array2d::{Array2D, Array2DIter, Int2},
     corpus::Corpus,
@@ -94,16 +96,14 @@ impl Letterfield {
         self.field.iter()
     }
 
-    pub fn random_with_no_matches(width: usize, height: usize, corpus: &Corpus) -> Self {
+    pub fn random_with_no_matches(width: usize, height: usize, corpus: &Corpus) -> (Self, usize) {
         let mut letterfield = Letterfield::random(width, height, corpus);
-        // let mut c = 0;
+        let mut c = 0;
         loop {
-            let (matches, _replacements) =
-                letterfield.find_word_matches_and_fill_spaces_randomly(corpus);
-            // c += 1;
-            // dbg!(c, matches.len());
-            if matches.is_empty() {
-                break letterfield;
+            c += 1;
+            let resolve = letterfield.find_word_matches_and_fill_spaces_randomly(corpus);
+            if resolve.matches.is_empty() {
+                break (letterfield, c);
             }
         }
     }
@@ -124,27 +124,6 @@ impl Letterfield {
         let field = Array2D::try_from(cols).unwrap();
 
         Self { id_count, field }
-    }
-
-    pub fn find_word_matches_and_fill_spaces_randomly(
-        &mut self,
-        corpus: &Corpus,
-    ) -> (Vec<WordMatch>, HashSet<(Int2, (u32, char))>) {
-        let word_matches = self.find_word_matches(corpus);
-        let positions: HashSet<Int2> = word_matches
-            .iter()
-            .flat_map(|m| m.tiles.iter().map(|(_, _, pos)| *pos))
-            .collect();
-        let replacements: HashSet<(Int2, (u32, char))> = positions
-            .into_iter()
-            .map(|pos| {
-                let c = corpus.random_char();
-                let id = self.next_id();
-                self.field[pos] = (id, c);
-                (pos, (id, c))
-            })
-            .collect();
-        (word_matches, replacements)
     }
 
     // pub fn chars_and_positions(&self) -> Vec<(char, Int2)> {
@@ -310,6 +289,111 @@ impl Display for Letterfield {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct LetterfieldResolve {
+    matches: Vec<WordMatch>,
+    new_letters: Vec<(Int2, u32, char)>,
+    old_letters: Vec<(Int2, u32, char)>,
+    /// from, to, ..
+    moving_letters: Vec<(Int2, Int2, u32, char)>,
+}
+
+impl Letterfield {
+    // slides letters down in columns where matches were.
+    pub fn find_word_matches_and_fill_spaces_randomly(
+        &mut self,
+        corpus: &Corpus,
+    ) -> LetterfieldResolve {
+        let matches = self.find_word_matches(corpus);
+
+        // determine which positions need to be filled:
+        let match_positions: HashSet<Int2> = matches
+            .iter()
+            .flat_map(|m| m.tiles.iter().map(|(_, _, pos)| *pos))
+            .collect();
+
+        let mut hm_before: HashMap<u32, (Int2, char)> = self
+            .field
+            .iter()
+            .map(|(pos, (id, char))| (id, (pos, char)))
+            .collect();
+
+        // nerf old letters out and let other letters in that column slide down:
+
+        let remove_match_positions_from_column_fill_start_with_random =
+            |col: Vec<(u32, char)>| -> Vec<(u32, char)> {
+                let mut elements_removed: usize = 0;
+                let new_col = col
+                    .into_iter()
+                    .rev()
+                    .filter(|(id, char)| {
+                        let (pos, _) = hm_before[id];
+                        if match_positions.contains(&pos) {
+                            elements_removed += 1;
+                            false
+                        } else {
+                            true
+                        }
+                    })
+                    .chain((0..elements_removed).map(|_| {
+                        let next_id = self.next_id();
+                        let char = corpus.random_char();
+                        (next_id, char)
+                    }))
+                    .rev()
+                    .collect();
+                new_col
+            };
+
+        self.field.cols = self
+            .field
+            .cols
+            .into_iter()
+            .map(remove_match_positions_from_column_fill_start_with_random)
+            .collect();
+
+        let mut hm_after: HashMap<u32, (Int2, char)> = self
+            .field
+            .iter()
+            .map(|(pos, (id, char))| (id, (pos, char)))
+            .collect();
+
+        // determinining the actual changes:
+
+        let mut new_letters: Vec<(Int2, u32, char)> = vec![];
+        let mut old_letters: Vec<(Int2, u32, char)> = vec![];
+        let mut moving_letters: Vec<(Int2, Int2, u32, char)> = vec![];
+
+        for (id, (pos_before, char_before)) in &hm_before {
+            if let Some((pos_after, char_after)) = hm_after.get(id) {
+                assert_eq!(char_before, char_after);
+                if pos_after != pos_before {
+                    moving_letters.push((*pos_before, *pos_after, *id, *char_before));
+                } else {
+                    // nothing changed about this letter
+                }
+            } else {
+                old_letters.push((*pos_before, *id, *char_before));
+            }
+        }
+
+        for (id, (pos, char)) in &hm_after {
+            if !hm_before.contains_key(id) {
+                new_letters.push((*pos, *id, *char));
+            }
+        }
+
+        // return:
+
+        LetterfieldResolve {
+            matches,
+            old_letters,
+            new_letters,
+            moving_letters,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::models::{corpus::Corpus, letterfield::Letterfield};
@@ -324,11 +408,11 @@ mod test {
 
     #[test]
     fn letterfield_matches() {
-        let corpus = Corpus::from_txt_file("assets/english3000.txt").unwrap();
+        let corpus = Corpus::from_txt_file("assets/english3000.txt", 5).unwrap();
         let letterfield = Letterfield::random(20, 20, &corpus);
         // probabilistic test but should be fine: (on average 30 matches in 20x20)
         assert!(!letterfield.find_word_matches(&corpus).is_empty());
-        let letterfield = Letterfield::random_with_no_matches(20, 20, &corpus);
+        let (letterfield, _) = Letterfield::random_with_no_matches(20, 20, &corpus);
         assert!(letterfield.find_word_matches(&corpus).is_empty());
     }
 }

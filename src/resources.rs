@@ -9,7 +9,7 @@ use crate::{
     models::{
         array2d::Int2,
         corpus::Corpus,
-        letterfield::{Letterfield, WordMatch},
+        letterfield::{self, Letterfield, WordMatch},
     },
 };
 
@@ -99,8 +99,10 @@ fn load_text_styles(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 /// todo later: put this in loading stage
 fn load_corpus_and_init_letterfield(mut commands: Commands) {
-    let corpus = Corpus::from_txt_file("assets/english3000.txt").unwrap();
-    let letterfield = Letterfield::random(LETTERFIELD_SIZE.x, LETTERFIELD_SIZE.y, &corpus);
+    let corpus = Corpus::from_txt_file("assets/english3000.txt", 4).unwrap();
+    let (letterfield, tries) =
+        Letterfield::random_with_no_matches(LETTERFIELD_SIZE.x, LETTERFIELD_SIZE.y, &corpus);
+    println!("Letterfield created with {tries} tries");
     commands.insert_resource(CorpusResource(corpus));
     commands.insert_resource(LetterfieldResource(letterfield));
 

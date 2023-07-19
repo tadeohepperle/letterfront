@@ -29,7 +29,7 @@ impl From<(usize, usize)> for Int2 {
 pub struct Array2D<T> {
     pub width: usize,
     pub height: usize,
-    cols: Vec<Vec<T>>,
+    pub cols: Vec<Vec<T>>,
 }
 
 impl<T: Clone> Array2D<T> {

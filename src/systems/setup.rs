@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{HoverTile, LetterTile},
+    components::{EmptyComponent, HoverTile, LetterTile},
     constants::{TILE_GAP_FACTOR, TILE_SIZE, TILE_SPRITE_SIZE},
     models::{array2d::Int2, letterfield::Letterfield},
     resources::{FontAssets, LetterfieldResource},
@@ -29,7 +29,7 @@ fn setup_letter_field_tiles(
 ) {
     // create lettertiles
     for (pos, (id, character)) in letterfield.0.iter() {
-        create_new_letter_tile(
+        create_letter_tile(
             id,
             character,
             pos,
@@ -37,21 +37,25 @@ fn setup_letter_field_tiles(
             &font_assets,
             &asset_server,
             &mut commands,
+            EmptyComponent,
+            None,
         );
     }
 }
 
-fn create_new_letter_tile(
+pub fn create_letter_tile(
     id: u32,
     character: char,
     pos: Int2,
-
     letterfield: &Letterfield,
     font_assets: &FontAssets,
     asset_server: &AssetServer,
     commands: &mut Commands,
+    additional: impl Component,
+    custom_position: Option<Vec2>,
 ) {
-    let word_pos = char_pos_to_world_pos(pos, letterfield.width(), letterfield.height());
+    let word_pos = custom_position
+        .unwrap_or_else(|| char_pos_to_world_pos(pos, letterfield.width(), letterfield.height()));
     // the parent:
     let tile = (
         SpatialBundle {
@@ -63,6 +67,7 @@ fn create_new_letter_tile(
         },
         LetterTile { character, pos, id },
         HoverTile { hovered: false },
+        additional,
     );
 
     // child 1: the sprite
