@@ -4,15 +4,16 @@ use bevy::{
     utils::{HashMap, HashSet},
     window::CursorGrabMode,
 };
+use rand::random;
 
 use crate::{
-    components::{FallingLetter, HoverableTile, LetterTile},
-    constants::{FALLING_TIME_PER_UNIT, GRAVITY_ACCELERATION, RESOLVE_DURATION},
+    components::{FadingLetter, FallingLetter, HoverableTile, LetterTile},
+    constants::{GRAVITY_ACCELERATION, RESOLVE_DURATION},
     models::{
         array2d::Int2,
         letterfield::{self, Letterfield, WordMatch},
     },
-    resources::{CorpusResource, FontAssets, LetterfieldResource, WordMatchesResource},
+    resources::{CorpusResource, FontAssets, LetterfieldResource, WordMatchesResource, GrabbedLetterResource},
     systems::setup::create_letter_tile,
     utils::{char_pos_to_world_pos, char_pos_to_world_pos_i, AnimationDriver},
 };
@@ -26,7 +27,12 @@ impl Plugin for IngameStateResolvePlugin {
             .add_systems(
                 Update,
                 animate_falling_tiles.run_if(in_state(IngameState::Resolve)),
+            ).add_systems(
+                Update,
+                animate_fading_tiles,
             )
+
+            
             // .add_systems(Update, animate_dying_tiles)
             // .add_systems(Update, destroy_dying_tiles_out_of_bounds);
 
@@ -61,12 +67,19 @@ pub fn start_resolving(
         println!("transition back to inspect");
         next_state.set(IngameState::Inspect);
         return;
+    } else {
+        // todo!() needle, add the matches to a score!!!
+        for m in resolve.matches {
+            println!("Match: {}", m.word);
+        }
     }
 
     // new letters get spawned in
     for (id, (pos, char)) in resolve.new_letters {
+        const INITIAL_Y: isize = -5;
+
         let start_world_pos = char_pos_to_world_pos_i(
-            (pos.x as isize, -5),
+            (pos.x as isize, pos.y as isize - 10),
             letterfield.0.width(),
             letterfield.0.height(),
         );
@@ -85,7 +98,7 @@ pub fn start_resolving(
                 start_world_pos,
                 target_world_pos,
                 time: 0.0,
-                target_time: (pos.y as f32 + 5.0 as f32) * FALLING_TIME_PER_UNIT,
+                target_time: 1.0,
             },
             Some(start_world_pos),
         );
@@ -108,14 +121,15 @@ pub fn start_resolving(
                     start_world_pos,
                     target_world_pos,
                     time: 0.0,
-                    target_time: (from.y as f32 - to.y as f32).abs() * FALLING_TIME_PER_UNIT,
+                    target_time: (from.y as f32 - to.y as f32).abs() * 0.1,
                 });
         }
 
         if let Some((pos, char)) = resolve.old_letters.get(&letter_tile.id) {
-            println!("despawned {char} at {pos:?}");
-            // todo!() needle
-            commands.entity(entity).despawn_recursive()
+            commands
+                .entity(entity)
+                .remove::<HoverableTile>()
+                .insert(FadingLetter::new());
         }
     }
 }
@@ -125,12 +139,12 @@ pub fn animate_falling_tiles(
     time: Res<Time>,
     mut commands: Commands,
     // just for forwarding to resolve again:
-    mut letterfield: ResMut<LetterfieldResource>,
+    letterfield: ResMut<LetterfieldResource>,
     corpus: Res<CorpusResource>,
-    mut tiles: Query<(Entity, &mut LetterTile)>,
+    tiles: Query<(Entity, &mut LetterTile)>,
     font_assets: Res<FontAssets>,
     asset_server: Res<AssetServer>,
-    mut next_state: ResMut<NextState<IngameState>>,
+    next_state: ResMut<NextState<IngameState>>,
 ) {
     let mut all_finished = true;
     for (entity, mut transform, mut falling) in &mut falling_tiles {
@@ -158,6 +172,19 @@ pub fn animate_falling_tiles(
             asset_server,
             next_state,
         )
+    }
+}
+
+pub fn animate_fading_tiles(
+    mut fading_tiles: Query<(Entity, &mut Transform, &mut FadingLetter)>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (entity, mut transform, mut falling) in &mut fading_tiles {
+        let finished = falling.drive(&mut transform, time.delta_seconds());
+        if finished {
+            commands.entity(entity).despawn_recursive();
+        }
     }
 }
 

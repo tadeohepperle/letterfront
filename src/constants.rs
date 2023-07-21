@@ -10,4 +10,4 @@ pub const TILE_GAP_FACTOR: f32 = 1.1;
 pub const RESOLVE_DURATION: Duration = Duration::from_millis(1000);
 pub const GRAVITY_ACCELERATION: f32 = 9.81;
 /// in seconds:
-pub const FALLING_TIME_PER_UNIT: f32 = 0.1;
+pub const FALLING_SPEED_PER_10_BLOCKS: f32 = 1.0;

@@ -68,7 +68,7 @@ fn exit_grabbed_state_if_not_mouse_pressed(
 fn move_grabbed_letter_to_cursor(
     mut cursor_state: ResMut<CursorState>,
     mut grabbed_letter: ResMut<GrabbedLetterResource>,
-    mut tiles: Query<(&mut Transform, &mut LetterTile)>,
+    mut tiles: Query<(&mut Transform, &mut LetterTile), With<HoverableTile>>,
     mut letterfield: ResMut<LetterfieldResource>,
     mut word_matches: ResMut<WordMatchesResource>,
     corpus: Res<CorpusResource>,

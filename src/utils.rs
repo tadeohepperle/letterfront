@@ -124,7 +124,7 @@ pub fn cursor_pos_to_grabbed_tile_pos(
 }
 
 pub trait AnimationDriver {
-    type ActOn: Component;
+    type ActOn;
 
     /// returns if finished
     fn drive(&mut self, act_on: &mut Self::ActOn, delta_seconds: f32) -> bool;
