@@ -33,11 +33,10 @@ impl Plugin for IngameStateGrabPlugin {
             Update,
             move_letter_tiles_to_correct_positions, // not only in grab state.
         )
-        // .add_systems(
-        //     Update,
-        //     update_word_matches_colors.after(update_hover_colors),
-        // );
-        ;
+        .add_systems(
+            Update,
+            update_word_matches_colors.after(update_hover_colors),
+        );
     }
 }
 
@@ -150,14 +149,31 @@ pub fn update_word_matches_colors(
         for child in children {
             if let Ok(mut sprite) = tile_sprites.get_mut(*child) {
                 let count = *word_matches.id_counts.get(&letter_tile.id).unwrap_or(&0);
-
-                sprite.color = match count {
-                    0 => Color::WHITE,
-                    1 => Color::LIME_GREEN,
-                    2 => Color::GREEN,
-                    3 => Color::DARK_GREEN,
-                    _ => Color::PURPLE,
-                };
+                // only if sprite color not already modified yet.
+                if sprite.color == Color::WHITE {
+                    sprite.color = match count {
+                        0 => Color::WHITE,
+                        1 => Color::Rgba {
+                            red: 0.75,
+                            green: 0.90,
+                            blue: 0.75,
+                            alpha: 1.0,
+                        },
+                        2 => Color::Rgba {
+                            red: 0.70,
+                            green: 0.85,
+                            blue: 0.70,
+                            alpha: 1.0,
+                        },
+                        3 => Color::Rgba {
+                            red: 0.65,
+                            green: 0.80,
+                            blue: 0.65,
+                            alpha: 1.0,
+                        },
+                        _ => Color::PURPLE,
+                    };
+                }
             }
         }
     }

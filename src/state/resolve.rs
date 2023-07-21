@@ -176,14 +176,20 @@ pub fn animate_falling_tiles(
 }
 
 pub fn animate_fading_tiles(
-    mut fading_tiles: Query<(Entity, &mut Transform, &mut FadingLetter)>,
+    mut fading_tiles: Query<(Entity, &mut Transform, &mut FadingLetter, &Children)>,
     time: Res<Time>,
     mut commands: Commands,
+    mut tile_sprites: Query<&mut Sprite>,
 ) {
-    for (entity, mut transform, mut falling) in &mut fading_tiles {
+    for (entity, mut transform, mut falling, children) in &mut fading_tiles {
         let finished = falling.drive(&mut transform, time.delta_seconds());
         if finished {
             commands.entity(entity).despawn_recursive();
+        }
+        for c in children{
+            if let Ok(mut sprite) = tile_sprites.get_mut(*c){
+                sprite.color = Color::AQUAMARINE;
+            }
         }
     }
 }
