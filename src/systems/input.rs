@@ -1,7 +1,7 @@
 use bevy::{prelude::*, window::CursorGrabMode};
 
 use crate::{
-    components::{HoverTile, LetterTile},
+    components::LetterTile,
     constants::TILE_SIZE,
     resources::{CursorState, GrabbedLetter, GrabbedLetterResource},
 };

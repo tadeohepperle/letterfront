@@ -291,11 +291,23 @@ impl Display for Letterfield {
 
 #[derive(Debug, Clone)]
 pub struct LetterfieldResolve {
-    matches: Vec<WordMatch>,
-    new_letters: Vec<(Int2, u32, char)>,
-    old_letters: Vec<(Int2, u32, char)>,
+    pub matches: Vec<WordMatch>,
+    pub new_letters: HashMap<u32, (Int2, char)>,
+    pub old_letters: HashMap<u32, (Int2, char)>,
     /// from, to, ..
-    moving_letters: Vec<(Int2, Int2, u32, char)>,
+    pub moving_letters: HashMap<u32, (Int2, Int2, char)>,
+}
+
+impl LetterfieldResolve {
+    pub fn is_empty(&self) -> bool {
+        let empty = self.matches.is_empty();
+        if empty {
+            assert!(self.new_letters.is_empty());
+            assert!(self.old_letters.is_empty());
+            assert!(self.moving_letters.is_empty());
+        }
+        empty
+    }
 }
 
 impl Letterfield {
@@ -312,7 +324,7 @@ impl Letterfield {
             .flat_map(|m| m.tiles.iter().map(|(_, _, pos)| *pos))
             .collect();
 
-        let mut hm_before: HashMap<u32, (Int2, char)> = self
+        let hm_before: HashMap<u32, (Int2, char)> = self
             .field
             .iter()
             .map(|(pos, (id, char))| (id, (pos, char)))
@@ -320,13 +332,15 @@ impl Letterfield {
 
         // nerf old letters out and let other letters in that column slide down:
 
+        let cols = std::mem::take(&mut self.field.cols);
+
         let remove_match_positions_from_column_fill_start_with_random =
             |col: Vec<(u32, char)>| -> Vec<(u32, char)> {
                 let mut elements_removed: usize = 0;
-                let new_col = col
+                let mut new_col: Vec<_> = col
                     .into_iter()
                     .rev()
-                    .filter(|(id, char)| {
+                    .filter(|(id, _char)| {
                         let (pos, _) = hm_before[id];
                         if match_positions.contains(&pos) {
                             elements_removed += 1;
@@ -335,51 +349,48 @@ impl Letterfield {
                             true
                         }
                     })
-                    .chain((0..elements_removed).map(|_| {
-                        let next_id = self.next_id();
-                        let char = corpus.random_char();
-                        (next_id, char)
-                    }))
-                    .rev()
                     .collect();
+                for _ in 0..elements_removed {
+                    let next_id = self.next_id();
+                    let char = corpus.random_char();
+                    new_col.push((next_id, char));
+                }
+                new_col.reverse();
                 new_col
             };
 
-        self.field.cols = self
-            .field
-            .cols
+        self.field.cols = cols
             .into_iter()
             .map(remove_match_positions_from_column_fill_start_with_random)
             .collect();
 
-        let mut hm_after: HashMap<u32, (Int2, char)> = self
+        let hm_after: HashMap<u32, (Int2, char)> = self
             .field
             .iter()
             .map(|(pos, (id, char))| (id, (pos, char)))
             .collect();
 
         // determinining the actual changes:
-
-        let mut new_letters: Vec<(Int2, u32, char)> = vec![];
-        let mut old_letters: Vec<(Int2, u32, char)> = vec![];
-        let mut moving_letters: Vec<(Int2, Int2, u32, char)> = vec![];
+        let mut new_letters: HashMap<u32, (Int2, char)> = HashMap::new();
+        let mut old_letters: HashMap<u32, (Int2, char)> = HashMap::new();
+        let mut moving_letters: HashMap<u32, (Int2, Int2, char)> = HashMap::new();
 
         for (id, (pos_before, char_before)) in &hm_before {
             if let Some((pos_after, char_after)) = hm_after.get(id) {
                 assert_eq!(char_before, char_after);
                 if pos_after != pos_before {
-                    moving_letters.push((*pos_before, *pos_after, *id, *char_before));
+                    moving_letters.insert(*id, (*pos_before, *pos_after, *char_before));
                 } else {
                     // nothing changed about this letter
                 }
             } else {
-                old_letters.push((*pos_before, *id, *char_before));
+                old_letters.insert(*id, (*pos_before, *char_before));
             }
         }
 
         for (id, (pos, char)) in &hm_after {
             if !hm_before.contains_key(id) {
-                new_letters.push((*pos, *id, *char));
+                new_letters.insert(*id, (*pos, *char));
             }
         }
 

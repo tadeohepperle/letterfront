@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{HoverTile, LetterTile},
+    components::{HoverableTile, LetterTile},
     constants::TILE_SIZE,
     resources::{CursorState, GrabbedLetter, GrabbedLetterResource},
 };
@@ -20,7 +20,7 @@ impl Plugin for IngameStateInspectPlugin {
 }
 
 pub fn update_hover_colors(
-    q_tiles: Query<(&HoverTile, &Children)>,
+    q_tiles: Query<(&HoverableTile, &Children)>,
     mut q_tile_sprites: Query<&mut Sprite>,
 ) {
     // todo!(): lerp!
@@ -38,7 +38,7 @@ pub fn update_hover_colors(
 }
 
 fn update_hover_state(
-    mut letter_tiles: Query<(Entity, &Transform, &mut HoverTile, &LetterTile)>,
+    mut letter_tiles: Query<(Entity, &Transform, &mut HoverableTile, &LetterTile)>,
     mut cursor_state: Res<CursorState>,
     mut windows: Query<&mut Window>,
     mut grabbed_letter: ResMut<GrabbedLetterResource>,
@@ -55,12 +55,12 @@ fn update_hover_state(
 
     let mut window = windows.get_single_mut().unwrap();
 
-    for (entity, transform, mut hover_tile, letter_tile) in &mut letter_tiles {
+    for (entity, transform, mut hoverable, letter_tile) in &mut letter_tiles {
         if cursor_is_on_tile(&cursor_state.world_pos, transform) {
             // if !hover_tile.hovered {
             //     dbg!(("Hover Enter", letter_tile));
             // }
-            hover_tile.hovered = true;
+            hoverable.hovered = true;
             any_hovered = true;
 
             if cursor_state.pressed && grabbed_letter.0.is_none() {
@@ -78,7 +78,7 @@ fn update_hover_state(
             // if hover_tile.hovered {
             //     dbg!(("Hover Exit", letter_tile));
             // }
-            hover_tile.hovered = false;
+            hoverable.hovered = false;
         }
     }
 

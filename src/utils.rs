@@ -1,4 +1,4 @@
-use bevy::prelude::Vec2;
+use bevy::prelude::{Component, Vec2};
 
 use crate::{
     constants::{TILE_GAP_FACTOR, TILE_SIZE},
@@ -26,6 +26,13 @@ pub fn char_pos_to_world_pos(char_pos: Int2, w: usize, h: usize) -> Vec2 {
     let char_pos = inv_char_pos_y(char_pos, w, h);
     let x = (char_pos.x as f32 - w as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
     let y = (char_pos.y as f32 - h as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
+    Vec2 { x, y }
+}
+
+pub fn char_pos_to_world_pos_i((x, y): (isize, isize), w: usize, h: usize) -> Vec2 {
+    let y = h as isize - y - 1;
+    let x = (x as f32 - w as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
+    let y = (y as f32 - h as f32 / 2.0) * TILE_GAP_FACTOR * TILE_SIZE;
     Vec2 { x, y }
 }
 
@@ -114,4 +121,11 @@ pub fn cursor_pos_to_grabbed_tile_pos(
     let new_char_pos = world_pos_to_char_pos(optimal_restricted, w, h);
 
     (optimal_restricted, new_char_pos)
+}
+
+pub trait AnimationDriver {
+    type ActOn: Component;
+
+    /// returns if finished
+    fn drive(&mut self, act_on: &mut Self::ActOn, delta_seconds: f32) -> bool;
 }

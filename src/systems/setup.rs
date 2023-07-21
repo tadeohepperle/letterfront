@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{EmptyComponent, HoverTile, LetterTile},
+    components::{EmptyComponent, HoverableTile, LetterTile},
     constants::{TILE_GAP_FACTOR, TILE_SIZE, TILE_SPRITE_SIZE},
     models::{array2d::Int2, letterfield::Letterfield},
     resources::{FontAssets, LetterfieldResource},
@@ -37,7 +37,7 @@ fn setup_letter_field_tiles(
             &font_assets,
             &asset_server,
             &mut commands,
-            EmptyComponent,
+            HoverableTile { hovered: false },
             None,
         );
     }
@@ -51,7 +51,7 @@ pub fn create_letter_tile(
     font_assets: &FontAssets,
     asset_server: &AssetServer,
     commands: &mut Commands,
-    additional: impl Component,
+    additional: impl Bundle,
     custom_position: Option<Vec2>,
 ) {
     let word_pos = custom_position
@@ -66,7 +66,6 @@ pub fn create_letter_tile(
             ..default()
         },
         LetterTile { character, pos, id },
-        HoverTile { hovered: false },
         additional,
     );
 

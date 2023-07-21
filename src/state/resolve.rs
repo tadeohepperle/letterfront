@@ -6,15 +6,15 @@ use bevy::{
 };
 
 use crate::{
-    components::{Dying, Falling, LetterTile},
-    constants::{GRAVITY_ACCELERATION, RESOLVE_DURATION},
+    components::{FallingLetter, HoverableTile, LetterTile},
+    constants::{FALLING_TIME_PER_UNIT, GRAVITY_ACCELERATION, RESOLVE_DURATION},
     models::{
         array2d::Int2,
-        letterfield::{self, LetterReplacement, Letterfield, WordMatch},
+        letterfield::{self, Letterfield, WordMatch},
     },
     resources::{CorpusResource, FontAssets, LetterfieldResource, WordMatchesResource},
     systems::setup::create_letter_tile,
-    utils::char_pos_to_world_pos,
+    utils::{char_pos_to_world_pos, char_pos_to_world_pos_i, AnimationDriver},
 };
 
 use super::IngameState;
@@ -27,14 +27,11 @@ impl Plugin for IngameStateResolvePlugin {
                 Update,
                 animate_falling_tiles.run_if(in_state(IngameState::Resolve)),
             )
-            .add_systems(Update, animate_dying_tiles)
-            .add_systems(Update, destroy_dying_tiles_out_of_bounds);
-    }
-}
+            // .add_systems(Update, animate_dying_tiles)
+            // .add_systems(Update, destroy_dying_tiles_out_of_bounds);
 
-#[derive(Debug, Clone, Resource)]
-pub struct ResolvingTimer {
-    timer: Timer,
+            ;
+    }
 }
 
 // #[derive(Debug, Clone, Event)]
@@ -47,92 +44,143 @@ pub struct ResolvingTimer {
 // pub struct EndResolving;
 
 pub fn start_resolving(
-    // mut start_resolving_tx: EventWriter<StartResolving>,
     mut letterfield: ResMut<LetterfieldResource>,
     corpus: Res<CorpusResource>,
-    tiles: Query<(Entity, &LetterTile)>,
+    mut tiles: Query<(Entity, &mut LetterTile)>,
     mut commands: Commands,
     font_assets: Res<FontAssets>,
     asset_server: Res<AssetServer>,
+    mut next_state: ResMut<NextState<IngameState>>,
 ) {
-    let letterfield_resolve = letterfield
+    println!("start resolve");
+    let resolve = letterfield
         .0
         .find_word_matches_and_fill_spaces_randomly(&corpus.0);
 
-    let removed_ids: HashSet<u32> = replacements.iter().map(|r| r.old.0).collect();
-
-    for (entity, tile) in &tiles {
-        if removed_ids.contains(&tile.id) {
-            commands
-                .entity(entity)
-                .remove::<LetterTile>()
-                .insert(Dying::random()); // todo random direction
-        }
+    if resolve.is_empty() {
+        println!("transition back to inspect");
+        next_state.set(IngameState::Inspect);
+        return;
     }
-    // add a NewLetterTile Component for all new tile,
-    for LetterReplacement {
-        pos,
-        old: _,
-        new: (new_id, new_char),
-    } in replacements
-    {
-        // id: u32,
-        // character: char,
-        // pos: Int2,
-        // letterfield: &Letterfield,
-        // font_assets: &FontAssets,
-        // asset_server: &AssetServer,
-        // commands: &mut Commands,
-        // additional: impl Component,
+
+    // new letters get spawned in
+    for (id, (pos, char)) in resolve.new_letters {
+        let start_world_pos = char_pos_to_world_pos_i(
+            (pos.x as isize, -5),
+            letterfield.0.width(),
+            letterfield.0.height(),
+        );
         let target_world_pos =
             char_pos_to_world_pos(pos, letterfield.0.width(), letterfield.0.height());
-        let mut initial_world_pos = target_world_pos;
-        initial_world_pos.y += 200.0;
+
         create_letter_tile(
-            new_id,
-            new_char,
+            id,
+            char,
             pos,
             &letterfield.0,
             &font_assets,
             &asset_server,
             &mut commands,
-            Falling { target_world_pos },
-            Some(initial_world_pos),
+            FallingLetter {
+                start_world_pos,
+                target_world_pos,
+                time: 0.0,
+                target_time: (pos.y as f32 + 5.0 as f32) * FALLING_TIME_PER_UNIT,
+            },
+            Some(start_world_pos),
         );
     }
-    // insert a timer that drives a system for animating old and new tiles, at the end resolve again.
-    commands.insert_resource(ResolvingTimer {
-        timer: Timer::new(RESOLVE_DURATION, TimerMode::Once),
-    })
+
+    for (entity, mut letter_tile) in &mut tiles {
+        if let Some((from, to, char)) = resolve.moving_letters.get(&letter_tile.id) {
+            assert_eq!(letter_tile.character, *char);
+            letter_tile.pos = *to;
+            // let entity fall
+
+            let start_world_pos =
+                char_pos_to_world_pos(*from, letterfield.0.width(), letterfield.0.height());
+            let target_world_pos =
+                char_pos_to_world_pos(*to, letterfield.0.width(), letterfield.0.height());
+            commands
+                .entity(entity)
+                .remove::<HoverableTile>()
+                .insert(FallingLetter {
+                    start_world_pos,
+                    target_world_pos,
+                    time: 0.0,
+                    target_time: (from.y as f32 - to.y as f32).abs() * FALLING_TIME_PER_UNIT,
+                });
+        }
+
+        if let Some((pos, char)) = resolve.old_letters.get(&letter_tile.id) {
+            println!("despawned {char} at {pos:?}");
+            // todo!() needle
+            commands.entity(entity).despawn_recursive()
+        }
+    }
 }
 
 pub fn animate_falling_tiles(
-    mut falling_tiles: Query<(Entity, &mut Transform, &LetterTile, &Falling)>,
-) {
-    // let all falling tiles fall down at constant speed:
-    // falling
-}
-
-pub fn animate_dying_tiles(
-    // mut falling_tiles: Query<(Entity, &mut Transform, &LetterTile, &Falling)>,
-    mut dying_tiles: Query<(&mut Transform, &mut Dying)>,
+    mut falling_tiles: Query<(Entity, &mut Transform, &mut FallingLetter)>,
     time: Res<Time>,
+    mut commands: Commands,
+    // just for forwarding to resolve again:
+    mut letterfield: ResMut<LetterfieldResource>,
+    corpus: Res<CorpusResource>,
+    mut tiles: Query<(Entity, &mut LetterTile)>,
+    font_assets: Res<FontAssets>,
+    asset_server: Res<AssetServer>,
+    mut next_state: ResMut<NextState<IngameState>>,
 ) {
-    for (mut transform, mut dying) in &mut dying_tiles {
-        dying.speed_down += GRAVITY_ACCELERATION * time.delta_seconds();
-        transform.translation +=
-            (dying.direction * dying.speed - Vec2::Y * dying.speed_down).extend(0.0);
+    let mut all_finished = true;
+    for (entity, mut transform, mut falling) in &mut falling_tiles {
+        let finished = falling.drive(&mut transform, time.delta_seconds());
+        if finished {
+            // transition to a normal tile: give it hovertile, remove falling tile
+            commands
+                .entity(entity)
+                .insert(HoverableTile { hovered: false })
+                .remove::<FallingLetter>();
+        } else {
+            all_finished = false;
+        }
+    }
+
+    if all_finished {
+        // transition back to inspect state, or resolve again
+        println!("transition all finished");
+        start_resolving(
+            letterfield,
+            corpus,
+            tiles,
+            commands,
+            font_assets,
+            asset_server,
+            next_state,
+        )
     }
 }
 
-pub fn destroy_dying_tiles_out_of_bounds(
-    dying_tiles: Query<(Entity, &Transform), With<Dying>>,
-    mut commands: Commands,
-) {
-    for (entity, transform) in &dying_tiles {
-        if transform.translation.y < -300.0 {
-            commands.entity(entity).despawn()
-        }
-        println!("Despawn entity {:?}", entity)
-    }
-}
+// pub fn animate_dying_tiles(
+//     // mut falling_tiles: Query<(Entity, &mut Transform, &LetterTile, &Falling)>,
+//     mut dying_tiles: Query<(&mut Transform, &mut Dying)>,
+//     time: Res<Time>,
+// ) {
+//     for (mut transform, mut dying) in &mut dying_tiles {
+//         dying.speed_down += GRAVITY_ACCELERATION * time.delta_seconds();
+//         transform.translation +=
+//             (dying.direction * dying.speed - Vec2::Y * dying.speed_down).extend(0.0);
+//     }
+// }
+
+// pub fn destroy_dying_tiles_out_of_bounds(
+//     dying_tiles: Query<(Entity, &Transform), With<Dying>>,
+//     mut commands: Commands,
+// ) {
+//     for (entity, transform) in &dying_tiles {
+//         if transform.translation.y < -300.0 {
+//             commands.entity(entity).despawn()
+//         }
+//         println!("Despawn entity {:?}", entity)
+//     }
+// }

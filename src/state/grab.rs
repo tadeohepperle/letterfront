@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::{
-    components::{HoverTile, LetterTile},
+    components::{FadingLetter, FallingLetter, HoverableTile, LetterTile},
     models::{array2d::Int2, letterfield},
     resources::{
         CorpusResource, CursorState, GrabbedLetterResource, LetterfieldResource,
@@ -124,7 +124,7 @@ fn move_grabbed_letter_to_cursor(
 }
 
 fn move_letter_tiles_to_correct_positions(
-    mut tiles: Query<(&mut Transform, &LetterTile)>,
+    mut tiles: Query<(&mut Transform, &LetterTile), With<HoverableTile>>,
     mut grabbed_letter: ResMut<GrabbedLetterResource>,
     letterfield: Res<LetterfieldResource>,
     time: Res<Time>,
