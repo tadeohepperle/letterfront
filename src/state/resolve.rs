@@ -70,7 +70,7 @@ pub fn start_resolving(
     } else {
         // todo!() needle, add the matches to a score!!!
         for m in resolve.matches {
-            println!("Match: {}", m.word);
+            println!("Match: {:?}", m.kind);
         }
     }
 

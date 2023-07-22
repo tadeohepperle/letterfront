@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{
-    constants::{LETTERFIELD_SIZE, LETTERTILE_TEXT_SIZE},
+    constants::{LETTERFIELD_SIZE, LETTERTILE_TEXT_SIZE, MIN_WORD_LENGTH},
     models::{
         array2d::Int2,
         corpus::Corpus,
@@ -99,7 +99,7 @@ fn load_text_styles(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 /// todo later: put this in loading stage
 fn load_corpus_and_init_letterfield(mut commands: Commands) {
-    let corpus = Corpus::from_txt_file("assets/english10000.txt", 4).unwrap();
+    let corpus = Corpus::from_txt_file("assets/3esl.txt", MIN_WORD_LENGTH).unwrap();
     let (letterfield, tries) =
         Letterfield::random_with_no_matches(LETTERFIELD_SIZE.x, LETTERFIELD_SIZE.y, &corpus);
     println!("Letterfield created with {tries} tries");

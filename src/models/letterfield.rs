@@ -153,36 +153,60 @@ impl Letterfield {
 
         // check all cols:
         for (line, start) in self.field.cols_2() {
-            for (word, s, e) in corpus.line_search(&line[..]) {
-                let tiles = (s..e)
-                    .map(|i| {
-                        let pos = start.with_y(i);
-                        let (id, ch) = self.field[pos];
-                        (id, ch, pos)
-                    })
-                    .collect();
+            let line_index_to_tile = |i| {
+                let pos = start.with_y(i);
+                let (id, ch) = self.field[pos];
+                (id, ch, pos)
+            };
+            // check all letters same:
+            let first = line.first().unwrap();
+            if line.iter().all(|e| e == first) {
+                let tiles = (0..line.len()).map(line_index_to_tile).collect();
                 let word_match = WordMatch {
-                    word,
                     tiles,
-                    kind: WordMatchKind::Column,
+                    direction: Direction::Column,
+                    kind: WordMatchKind::SameLetterRow(*first),
+                };
+                word_matches.push(word_match);
+                continue;
+            }
+            // check words:
+            for (word, s, e) in corpus.line_search(&line[..]) {
+                let tiles = (s..e).map(line_index_to_tile).collect();
+                let word_match = WordMatch {
+                    tiles,
+                    direction: Direction::Column,
+                    kind: WordMatchKind::Word(word),
                 };
                 word_matches.push(word_match);
             }
         }
         // check all rows:
         for (line, start) in self.field.rows_2() {
-            for (word, s, e) in corpus.line_search(&line[..]) {
-                let tiles = (s..e)
-                    .map(|i| {
-                        let pos = start.with_x(i);
-                        let (id, ch) = self.field[pos];
-                        (id, ch, pos)
-                    })
-                    .collect();
+            let line_index_to_tile = |i| {
+                let pos = start.with_x(i);
+                let (id, ch) = self.field[pos];
+                (id, ch, pos)
+            };
+            // check all letters same:
+            let first = line.first().unwrap();
+            if line.iter().all(|e| e == first) {
+                let tiles = (0..line.len()).map(line_index_to_tile).collect();
                 let word_match = WordMatch {
-                    word,
                     tiles,
-                    kind: WordMatchKind::Row,
+                    direction: Direction::Row,
+                    kind: WordMatchKind::SameLetterRow(*first),
+                };
+                word_matches.push(word_match);
+                continue;
+            }
+            // check words:
+            for (word, s, e) in corpus.line_search(&line[..]) {
+                let tiles = (s..e).map(line_index_to_tile).collect();
+                let word_match = WordMatch {
+                    tiles,
+                    direction: Direction::Row,
+                    kind: WordMatchKind::Word(word),
                 };
                 word_matches.push(word_match);
             }
@@ -201,9 +225,9 @@ impl Letterfield {
                     })
                     .collect();
                 let word_match = WordMatch {
-                    word,
                     tiles,
-                    kind: WordMatchKind::Row,
+                    direction: Direction::Row,
+                    kind: WordMatchKind::Word(word),
                 };
                 word_matches.push(word_match);
             }
@@ -232,18 +256,26 @@ impl Letterfield {
 
 #[derive(Debug, Clone)]
 pub struct WordMatch {
-    pub word: String,
     // char, x as in -->, y as in |
     //                            V
     pub tiles: Vec<(u32, char, Int2)>,
+    pub direction: Direction,
     pub kind: WordMatchKind,
+}
+
+// pub enum WordMatchKind
+
+#[derive(Debug, Clone)]
+pub enum Direction {
+    Column,
+    Row,
+    Diagonal,
 }
 
 #[derive(Debug, Clone)]
 pub enum WordMatchKind {
-    Column,
-    Row,
-    Diagonal,
+    Word(String),
+    SameLetterRow(char),
 }
 
 impl TryFrom<String> for Letterfield {
